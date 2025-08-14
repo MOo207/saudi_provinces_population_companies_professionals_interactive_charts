@@ -1,0 +1,1 @@
+A tiny interactive dashboard visualizing regional data in Saudi Arabia — population, companies, and professionals. The numbers, cases, and hidden patterns are based on data sourced from [Apollo.io](https://www.apollo.io). Built with HTML, Tailwind CSS, and Chart.js. Made possible by GPT.
