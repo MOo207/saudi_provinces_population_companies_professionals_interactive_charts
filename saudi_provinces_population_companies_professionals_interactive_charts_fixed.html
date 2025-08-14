@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>لوحة بيانات المناطق — سكان، شركات، محترفون</title>
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ["Tajawal", "ui-sans-serif", "system-ui"] },
+          colors: {
+            base: {
+              bg: "#0b1220",
+              card: "#0f172a",
+              ink: "#e2e8f0",
+              sub: "#94a3b8",
+              ring: "#334155",
+            },
+          },
+          boxShadow: {
+            soft: "0 10px 25px rgba(0,0,0,.25)",
+          },
+          borderRadius: { mega: "1.25rem" },
+        },
+      },
+      darkMode: "class",
+    };
+  </script>
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Chart.js v4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    html, body { height: 100%; }
+    .glass { background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); backdrop-filter: blur(6px); }
+    canvas { max-height: 360px; }
+  </style>
+</head>
+<body class="bg-base-bg text-base-ink font-sans">
+  <div class="min-h-screen max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <header class="flex items-center justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-bold">لوحة بيانات المناطق في السعودية</h1>
+        <p class="text-base-sub mt-1">سكان 2022 • عدد الشركات • المهنيون المحترفون — مع رسوم تفاعلية متعددة</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="toggleTheme" class="px-4 py-2 rounded-2xl bg-base-card shadow-soft border border-base-ring hover:opacity-90 transition">الوضع الفاتح/الداكن</button>
+        <button id="downloadAll" class="px-4 py-2 rounded-2xl bg-white/10 shadow-soft border border-base-ring hover:opacity-90 transition">تحميل كل الرسوم</button>
+      </div>
+    </header>
+
+    <!-- Data Overview Cards -->
+    <section class="grid md:grid-cols-4 gap-4 mb-8">
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <div class="text-sm text-base-sub">إجمالي السكان</div>
+        <div id="kpiPop" class="text-2xl font-bold mt-2">—</div>
+      </div>
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <div class="text-sm text-base-sub">إجمالي الشركات</div>
+        <div id="kpiComp" class="text-2xl font-bold mt-2">—</div>
+      </div>
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <div class="text-sm text-base-sub">إجمالي المحترفين</div>
+        <div id="kpiProf" class="text-2xl font-bold mt-2">—</div>
+      </div>
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <div class="text-sm text-base-sub">عدد المناطق</div>
+        <div id="kpiRegions" class="text-2xl font-bold mt-2">4</div>
+      </div>
+    </section>
+
+    <!-- Controls -->
+    <section class="glass rounded-mega p-5 shadow-soft border border-base-ring mb-8">
+      <div class="grid md:grid-cols-3 gap-4 items-center">
+        <label class="flex items-center gap-3">نوع المخطط:
+          <select id="chartSwitcher" class="w-full md:w-auto bg-transparent border border-base-ring rounded-xl px-3 py-2">
+            <option value="bar">أعمدة (Population)</option>
+            <option value="barY">أعمدة أفقية (Companies)</option>
+            <option value="line">خطّي (Population)</option>
+            <option value="stacked">أعمدة مكدّسة (الكل)</option>
+            <option value="pie">دائري (Population)</option>
+            <option value="doughnut">دونات (Companies)</option>
+            <option value="polar">Polar Area (Professionals)</option>
+            <option value="radar">رادار (مقارنة نسبية)</option>
+            <option value="scatter">تبعثر (Pop vs Companies)</option>
+            <option value="bubble">فقاعي (Pop/Comp/Prof)</option>
+          </select>
+        </label>
+        <button id="downloadCurrent" class="px-4 py-2 rounded-2xl bg-white/10 shadow-soft border border-base-ring hover:opacity-90 transition">تحميل المخطط الحالي</button>
+        <span class="text-base-sub text-sm">نصيحة: مرّر على الأسطورة لإظهار/إخفاء السلاسل.</span>
+      </div>
+    </section>
+
+    <!-- Charts Grid -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Primary (switchable) chart -->
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <div class="flex items-center justify-between mb-3">
+          <h2 id="primaryTitle" class="font-bold">أعمدة — السكان</h2>
+        </div>
+        <canvas id="primaryChart"></canvas>
+      </div>
+
+      <!-- Grouped bars (all metrics) -->
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold">أعمدة مجمّعة — سكان / شركات / محترفون</h2>
+          <button class="text-sm underline" data-dl="#groupedChart">تحميل</button>
+        </div>
+        <canvas id="groupedChart"></canvas>
+      </div>
+
+      <!-- Stacked bars fixed -->
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold">مكدّس حسب الفئة</h2>
+          <button class="text-sm underline" data-dl="#stackedFixed">تحميل</button>
+        </div>
+        <canvas id="stackedFixed"></canvas>
+      </div>
+
+      <!-- Pie trio -->
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <h2 class="font-bold mb-3">مخططات دائرية</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="space-y-2">
+            <div class="text-sm text-base-sub">Population</div>
+            <canvas id="piePop"></canvas>
+          </div>
+          <div class="space-y-2">
+            <div class="text-sm text-base-sub">Companies</div>
+            <canvas id="pieComp"></canvas>
+          </div>
+          <div class="space-y-2">
+            <div class="text-sm text-base-sub">Professionals</div>
+            <canvas id="pieProf"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Radar & Polar -->
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <h2 class="font-bold mb-3">رادار & Polar</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="h-80"><canvas id="radar"></canvas></div>
+          <div class="h-80"><canvas id="polar"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Scatter & Bubble -->
+      <div class="glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <h2 class="font-bold mb-3">تبعثر & فقاعي</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="h-80"><canvas id="scatter"></canvas></div>
+          <div class="h-80"><canvas id="bubble"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Data table -->
+      <div class="lg:col-span-2 glass rounded-mega p-5 shadow-soft border border-base-ring">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold">البيانات المصدرية</h2>
+          <button id="downloadCSV" class="text-sm underline">تنزيل CSV</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-base-sub">
+              <tr>
+                <th class="text-right py-2">المنطقة</th>
+                <th class="text-right py-2">السكان (2022)</th>
+                <th class="text-right py-2">الشركات</th>
+                <th class="text-right py-2">المحترفون</th>
+              </tr>
+            </thead>
+            <tbody id="dataRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="text-center text-base-sub text-xs mt-10">© 2025 — تم الإنشاء لأغراض استكشافية تعليمية</footer>
+  </div>
+
+  <script>
+    // --- Data ---------------------------------------------------------------
+    const regions = [
+      { key: "riyadh", name: "منطقة الرياض" },
+      { key: "makkah", name: "منطقة مكة المكرمة" },
+      { key: "eastern", name: "المنطقة الشرقية" },
+      { key: "madinah", name: "منطقة المدينة المنورة" },
+    ];
+
+    const population = { // سكان 2022
+      riyadh: 8591748,
+      makkah: 8021463,
+      eastern: 5125254,
+      madinah: 1411599,
+    };
+
+    const companies = {
+      riyadh: 34099,
+      makkah: 14686,
+      eastern: 11012,
+      madinah: 1530,
+    };
+
+    const professionals = {
+      riyadh: 547745,
+      makkah: 209525,
+      eastern: 218437,
+      madinah: 25115,
+    };
+
+    const fmt = (n) => n.toLocaleString('ar-EG');
+
+    // KPIs
+    const sum = (obj) => Object.values(obj).reduce((a,b)=>a+b,0);
+    document.getElementById('kpiPop').textContent = fmt(sum(population));
+    document.getElementById('kpiComp').textContent = fmt(sum(companies));
+    document.getElementById('kpiProf').textContent = fmt(sum(professionals));
+
+    // Table
+    const tbody = document.getElementById('dataRows');
+    regions.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="py-2">${r.name}</td>
+        <td class="py-2">${fmt(population[r.key])}</td>
+        <td class="py-2">${fmt(companies[r.key])}</td>
+        <td class="py-2">${fmt(professionals[r.key])}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Helpers to build datasets with auto colors (Chart.js handles defaults)
+    const labels = regions.map(r => r.name);
+    const vals = (obj) => regions.map(r => obj[r.key]);
+
+    const makeDataset = (label, data, extra={}) => ({ label, data, borderWidth: 2, tension: 0.2, ...extra });
+
+    // Download helpers
+    const toImage = (canvas, name="chart.png") => {
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png', 1);
+      a.download = name;
+      a.click();
+    };
+
+    // CSV download
+    document.getElementById('downloadCSV').addEventListener('click', () => {
+      const rows = [
+        ['المنطقة','السكان 2022','الشركات','المحترفون'],
+        ...regions.map(r => [r.name, population[r.key], companies[r.key], professionals[r.key]])
+      ];
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'regions_data.csv'; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Theme toggle
+    document.getElementById('toggleTheme').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+    });
+
+    // Primary switchable chart
+    const primaryCtx = document.getElementById('primaryChart');
+    let primaryChart;
+    const primaryTitle = document.getElementById('primaryTitle');
+
+    function buildPrimary(type) {
+      if (primaryChart) primaryChart.destroy();
+
+      let cfg = { type: 'bar', data: {}, options: {} };
+
+      if (type === 'bar') {
+        primaryTitle.textContent = 'أعمدة — السكان';
+        cfg = {
+          type: 'bar',
+          data: { labels, datasets: [ makeDataset('السكان', vals(population)) ] },
+          options: { responsive: true, plugins: { legend: { display: true }, tooltip: { enabled: true } } }
+        };
+      }
+      if (type === 'barY') {
+        primaryTitle.textContent = 'أعمدة أفقية — الشركات';
+        cfg = {
+          type: 'bar',
+          data: { labels, datasets: [ makeDataset('الشركات', vals(companies)) ] },
+          options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: true } } }
+        };
+      }
+      if (type === 'line') {
+        primaryTitle.textContent = 'خطّي — السكان';
+        cfg = {
+          type: 'line',
+          data: { labels, datasets: [ makeDataset('السكان', vals(population)) ] },
+          options: { responsive: true, plugins: { legend: { display: true } } }
+        };
+      }
+      if (type === 'stacked') {
+        primaryTitle.textContent = 'أعمدة مكدّسة — جميع المؤشرات';
+        cfg = {
+          type: 'bar',
+          data: { labels, datasets: [
+            makeDataset('السكان', vals(population)),
+            makeDataset('الشركات', vals(companies)),
+            makeDataset('المحترفون', vals(professionals)),
+          ]},
+          options: { scales: { x: { stacked: true }, y: { stacked: true } } }
+        };
+      }
+      if (type === 'pie') {
+        primaryTitle.textContent = 'دائري — توزيع السكان';
+        cfg = { type: 'pie', data: { labels, datasets: [ makeDataset('السكان', vals(population)) ] } };
+      }
+      if (type === 'doughnut') {
+        primaryTitle.textContent = 'دونات — توزيع الشركات';
+        cfg = { type: 'doughnut', data: { labels, datasets: [ makeDataset('الشركات', vals(companies)) ] } };
+      }
+      if (type === 'polar') {
+        primaryTitle.textContent = 'Polar Area — المحترفون';
+        cfg = { type: 'polarArea', data: { labels, datasets: [ makeDataset('المحترفون', vals(professionals)) ] } };
+      }
+      if (type === 'radar') {
+        primaryTitle.textContent = 'رادار — مؤشرات قياسية';
+        // Normalize to [0,1] for comparison feel
+        const maxPop = Math.max(...vals(population));
+        const maxComp = Math.max(...vals(companies));
+        const maxProf = Math.max(...vals(professionals));
+        cfg = {
+          type: 'radar',
+          data: { labels, datasets: [
+            makeDataset('السكان (نسبي)', vals(population).map(v=>v/maxPop)),
+            makeDataset('الشركات (نسبي)', vals(companies).map(v=>v/maxComp)),
+            makeDataset('المحترفون (نسبي)', vals(professionals).map(v=>v/maxProf)),
+          ]},
+          options: { scales: { r: { beginAtZero: true, suggestedMax: 1 } } }
+        };
+      }
+      if (type === 'scatter') {
+        primaryTitle.textContent = 'تبعثر — السكان مقابل الشركات';
+        const data = regions.map(r => ({ x: population[r.key], y: companies[r.key], r: Math.sqrt(professionals[r.key])/10 }));
+        cfg = {
+          type: 'scatter',
+          data: { datasets: [ { label: 'النقاط (نصف القطر ∝ المحترفين)', data, parsing: { xAxisKey: 'x', yAxisKey: 'y' } } ] },
+          options: { scales: { x: { title: { display:true, text: 'السكان' } }, y: { title: { display:true, text: 'الشركات' } } }, plugins: { tooltip: { callbacks: { label(ctx){ const i = ctx.dataIndex; const r = regions[i]; return `${r.name}: سكان ${fmt(ctx.raw.x)}، شركات ${fmt(ctx.raw.y)}`; } } } } }
+        };
+      }
+      if (type === 'bubble') {
+        primaryTitle.textContent = 'فقاعي — السكان/الشركات/المحترفون';
+        const data = regions.map(r => ({ x: population[r.key], y: companies[r.key], r: Math.cbrt(professionals[r.key]) / 10 }));
+        cfg = {
+          type: 'bubble',
+          data: { datasets: [ { label: 'الفقاعات (الحجم ∝ المحترفين)', data } ] },
+          options: { scales: { x: { title: { display:true, text: 'السكان' } }, y: { title: { display:true, text: 'الشركات' } } } }
+        };
+      }
+
+      primaryChart = new Chart(primaryCtx, cfg);
+    }
+
+    buildPrimary('bar');
+
+    // Switcher
+    document.getElementById('chartSwitcher').addEventListener('change', (e) => buildPrimary(e.target.value));
+
+    // Download current
+    document.getElementById('downloadCurrent').addEventListener('click', () => toImage(primaryCtx, 'primary_chart.png'));
+
+    // Download all (visible ones)
+    document.getElementById('downloadAll').addEventListener('click', () => {
+      document.querySelectorAll('canvas').forEach((c, i) => toImage(c, `chart_${i+1}.png`));
+    });
+
+    // Per-card download buttons
+    document.querySelectorAll('[data-dl]').forEach(btn => btn.addEventListener('click', (e) => {
+      const sel = e.currentTarget.getAttribute('data-dl');
+      const canvas = document.querySelector(sel);
+      if (canvas) toImage(canvas, sel.replace('#','') + '.png');
+    }));
+
+    // Fixed charts ----------------------------------------------------------
+    const grouped = new Chart(document.getElementById('groupedChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          makeDataset('السكان', vals(population)),
+          makeDataset('الشركات', vals(companies)),
+          makeDataset('المحترفون', vals(professionals)),
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'top' } } }
+    });
+
+    const stackedFixed = new Chart(document.getElementById('stackedFixed'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          makeDataset('السكان', vals(population)),
+          makeDataset('الشركات', vals(companies)),
+          makeDataset('المحترفون', vals(professionals)),
+        ]
+      },
+      options: { scales: { x: { stacked: true }, y: { stacked: true } } }
+    });
+
+    const piePop = new Chart(document.getElementById('piePop'), { type: 'pie', data: { labels, datasets: [ makeDataset('السكان', vals(population)) ] } });
+    const pieComp = new Chart(document.getElementById('pieComp'), { type: 'doughnut', data: { labels, datasets: [ makeDataset('الشركات', vals(companies)) ] } });
+    const pieProf = new Chart(document.getElementById('pieProf'), { type: 'pie', data: { labels, datasets: [ makeDataset('المحترفون', vals(professionals)) ] } });
+
+    const radar = new Chart(document.getElementById('radar'), {
+      type: 'radar',
+      data: {
+        labels,
+        datasets: [
+          makeDataset('السكان (نسبي)', (() => { const m = Math.max(...vals(population)); return vals(population).map(v=>v/m); })()),
+          makeDataset('الشركات (نسبي)', (() => { const m = Math.max(...vals(companies)); return vals(companies).map(v=>v/m); })()),
+          makeDataset('المحترفون (نسبي)', (() => { const m = Math.max(...vals(professionals)); return vals(professionals).map(v=>v/m); })()),
+        ]
+      },
+      options: { scales: { r: { beginAtZero: true, suggestedMax: 1 } } }
+    });
+
+    const polar = new Chart(document.getElementById('polar'), {
+      type: 'polarArea',
+      data: { labels, datasets: [ makeDataset('المحترفون', vals(professionals)) ] },
+    });
+
+    const scatter = new Chart(document.getElementById('scatter'), {
+      type: 'scatter',
+      data: { datasets: [ { label: 'Pop vs Comp', data: regions.map(r=>({ x: population[r.key], y: companies[r.key] })) } ] },
+      options: { scales: { x: { title: { display:true, text: 'السكان' } }, y: { title: { display:true, text: 'الشركات' } } } }
+    });
+
+    const bubble = new Chart(document.getElementById('bubble'), {
+      type: 'bubble',
+      data: { datasets: [ { label: 'حجم ∝ المحترفين', data: regions.map(r=>({ x: population[r.key], y: companies[r.key], r: Math.cbrt(professionals[r.key]) / 10 })) } ] },
+      options: { scales: { x: { title: { display:true, text: 'السكان' } }, y: { title: { display:true, text: 'الشركات' } } } }
+    });
+  </script>
+</body>
+</html>
